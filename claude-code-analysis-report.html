@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code 源代码深度分析报告</title>
+    <style>
+        :root {
+            --primary: #7c3aed;
+            --primary-dark: #5b21b6;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-hover: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #475569;
+            --code-bg: #0d1117;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.7;
+            min-height: 100vh;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, #1e1b4b 50%, var(--bg-dark) 100%);
+            padding: 80px 20px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%237c3aed' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero .subtitle {
+            font-size: 1.4rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 50px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--secondary);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Navigation */
+        .nav {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .nav-inner::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .nav a:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .nav a.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Main Content */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        section {
+            margin-bottom: 60px;
+        }
+
+        h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h2 .icon {
+            font-size: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 30px 0 15px;
+            color: var(--accent);
+        }
+
+        h4 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 20px 0 10px;
+            color: var(--secondary);
+        }
+
+        p {
+            margin-bottom: 15px;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(124, 58, 237, 0.15);
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .card h4 {
+            margin-top: 0;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Tables */
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 20px 0;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+        }
+
+        th {
+            background: var(--primary-dark);
+            color: white;
+            padding: 15px 20px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        tr:hover td {
+            background: var(--bg-hover);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Code Blocks */
+        pre {
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border: 1px solid var(--border);
+            font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        code {
+            font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #a78bfa;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: var(--text-primary);
+        }
+
+        .code-comment { color: #6a737d; }
+        .code-keyword { color: #ff7b72; }
+        .code-string { color: #a5d6ff; }
+        .code-function { color: #d2a8ff; }
+        .code-type { color: #79c0ff; }
+        .code-number { color: #79c0ff; }
+
+        /* Lists */
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 25px;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        li::marker {
+            color: var(--primary);
+        }
+
+        /* Architecture Diagram */
+        .arch-diagram {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 40px;
+            margin: 20px 0;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .arch-node {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 140px;
+            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+        }
+
+        .arch-node.secondary {
+            background: linear-gradient(135deg, var(--secondary) 0%, #059669 100%);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .arch-node.accent {
+            background: linear-gradient(135deg, var(--accent) 0%, #d97706 100%);
+            box-shadow: 4px 4px 15px rgba(245, 158, 11, 0.3);
+        }
+
+        .arch-arrow {
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+        }
+
+        /* Highlight Box */
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
+            border-left: 4px solid var(--primary);
+            padding: 20px 25px;
+            border-radius: 0 12px 12px 0;
+            margin: 20px 0;
+        }
+
+        .highlight-box.warning {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%);
+            border-left-color: var(--accent);
+        }
+
+        .highlight-box.success {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+            border-left-color: var(--secondary);
+        }
+
+        /* Tag/Badge */
+        .tag {
+            display: inline-block;
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            margin: 2px;
+        }
+
+        .tag.primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .tag.secondary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .tag.accent {
+            background: var(--accent);
+            color: var(--bg-dark);
+        }
+
+        /* Feature Flags */
+        .flag-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin: 15px 0;
+        }
+
+        .flag-item {
+            background: var(--bg-hover);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 13px;
+            color: var(--accent);
+            border: 1px solid var(--border);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.2rem;
+            }
+
+            .stats-bar {
+                gap: 25px;
+            }
+
+            .stat-value {
+                font-size: 1.8rem;
+            }
+
+            h2 {
+                font-size: 1.5rem;
+            }
+
+            .nav a {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+
+            .arch-flow {
+                flex-direction: column;
+            }
+
+            .arch-arrow {
+                transform: rotate(90deg);
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Section dividers */
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+    <header class="hero">
+        <div class="hero-content">
+            <span class="version-badge">v2.1.88</span>
+            <h1>Claude Code 源代码深度分析</h1>
+            <p class="subtitle">Anthropic 官方 CLI 工具的完整架构解析、性能优化、设计模式与工程实践</p>
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <div class="stat-value">1,884</div>
+                    <div class="stat-label">源文件</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">512K+</div>
+                    <div class="stat-label">代码行数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">40+</div>
+                    <div class="stat-label">内置工具</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">80+</div>
+                    <div class="stat-label">斜杠命令</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">192</div>
+                    <div class="stat-label">npm 依赖</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="#overview">项目概述</a>
+            <a href="#structure">目录结构</a>
+            <a href="#core">核心源码</a>
+            <a href="#tools">工具系统</a>
+            <a href="#deps">依赖分析</a>
+            <a href="#patterns">设计模式</a>
+            <a href="#commands">命令结构</a>
+            <a href="#keyfiles">关键文件</a>
+            <a href="#build">构建系统</a>
+            <a href="#special">特殊功能</a>
+            <a href="#summary">总结</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- 项目概述 -->
+        <section id="overview">
+            <h2><span class="icon">📋</span> 项目概述</h2>
+
+            <h3>项目定位</h3>
+            <div class="card">
+                <p>Claude Code 是 Anthropic 公司开发的官方 CLI 工具，用于与 Claude 模型交互并辅助开发者完成任务。该源码是从 npm 包 <code>@anthropic-ai/claude-code@2.1.88</code> 反编译提取的 TypeScript 源代码。</p>
+
+                <div class="highlight-box">
+                    <strong>关键事实：</strong>
+                    <ul>
+                        <li><strong>源码规模</strong>: 约 1,884 个文件，512,664 行代码</li>
+                        <li><strong>最大文件</strong>: <code>query.ts</code> (785KB)</li>
+                        <li><strong>构建后大小</strong>: 约 12MB 单文件 bundle (<code>cli.js</code>)</li>
+                        <li><strong>运行时</strong>: Bun 编译为 Node.js >= 18</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>核心架构</h3>
+            <div class="arch-diagram">
+                <div class="arch-flow">
+                    <div class="arch-node">cli.tsx<br><small>入口</small></div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-node secondary">main.tsx<br><small>主程序</small></div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-node accent">REPL / QueryEngine<br><small>交互/SDK</small></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h4>QueryEngine 数据流</h4>
+                <pre><code>QueryEngine: AsyncGenerator&lt;SDKMessage&gt; 管道
+  ├── fetchSystemPromptParts()  →  组装系统提示词
+  ├── processUserInput()       →  处理用户输入和命令
+  └── query()                  →  主 Agent 循环
+        ├── StreamingToolExecutor  →  并行工具执行
+        └── runTools()            →  工具编排</code></pre>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- 目录结构 -->
+        <section id="structure">
+            <h2><span class="icon">📁</span> 目录结构详解</h2>
+
+            <h3>核心目录</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>目录</th>
+                            <th>用途</th>
+                            <th>关键内容</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>src/entrypoints/</code></td>
+                            <td>应用入口点</td>
+                            <td><code>cli.tsx</code>, <code>sdk/</code>, <code>mcp.ts</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>src/cli/</code></td>
+                            <td>CLI 基础设施</td>
+                            <td>处理器、传输层、REPL</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/bridge/</code></td>
+                            <td>远程桥接</td>
+                            <td>Claude Desktop / 远程连接</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/commands/</code></td>
+                            <td>斜杠命令</td>
+                            <td>约 80+ 个命令实现</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/components/</code></td>
+                            <td>UI 组件</td>
+                            <td>React/Ink 终端 UI</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/hooks/</code></td>
+                            <td>React Hooks</td>
+                            <td>权限、状态管理等</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/services/</code></td>
+                            <td>业务逻辑层</td>
+                            <td>API、压缩、MCP、分析等</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/state/</code></td>
+                            <td>状态管理</td>
+                            <td>AppState Store + React Context</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/tasks/</code></td>
+                            <td>任务实现</td>
+                            <td>bash、agent、dream 等</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/tools/</code></td>
+                            <td>工具实现</td>
+                            <td>40+ 工具实现</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/types/</code></td>
+                            <td>类型定义</td>
+                            <td>TypeScript 类型</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/utils/</code></td>
+                            <td>工具函数</td>
+                            <td>最大目录，30+ 子目录</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/vendor/</code></td>
+                            <td>原生模块存根</td>
+                            <td>bun:ffi 等</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>源码统计</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <h4>📊 文件统计</h4>
+                    <ul>
+                        <li>TypeScript/TSX 文件: ~1,884 个</li>
+                        <li>代码行数: ~512,664 行</li>
+                        <li>内置工具: 40+ 个</li>
+                        <li>斜杠命令: 80+ 个</li>
+                        <li>npm 依赖: 192 个包</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>📦 包体积</h4>
+                    <ul>
+                        <li>最大文件: <code>query.ts</code> (785KB)</li>
+                        <li>构建后 bundle: ~12MB</li>
+                        <li>入口包装器: ~1.5KB</li>
+                        <li>压缩后可分发大小</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>⚙️ 运行时</h4>
+                    <ul>
+                        <li>Node.js >= 18</li>
+                        <li>Bun 编译产物</li>
+                        <li>支持 ES2022 特性</li>
+                        <li>ESNext 模块系统</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- 核心源码分析 -->
+        <section id="core">
+            <h2><span class="icon">⚙️</span> 核心源码分析</h2>
+
+            <h3>1. 入口点 (src/entrypoints/cli.tsx)</h3>
+            <div class="card">
+                <p>这是 CLI 的主入口，主要职责包括解析命令行参数、动态导入模块、特殊命令处理和特性标志驱动的死代码消除。</p>
+
+                <h4>核心逻辑</h4>
+                <pre><code><span class="code-comment">// 快速路径：--version 零导入</span>
+<span class="code-keyword">if</span> (args.length === <span class="code-number">1</span> && (args[<span class="code-number">0</span>] === <span class="code-string">'--version'</span> || args[<span class="code-number">0</span>] === <span class="code-string">'-v'</span>)) {
+    console.log(<span class="code-string">`<span class="code-variable">${MACRO.VERSION}</span> (Claude Code)`</span>);
+    <span class="code-keyword">return</span>;
+}
+
+<span class="code-comment">// 特性标志驱动的条件导入</span>
+<span class="code-keyword">if</span> (feature(<span class="code-string">'DAEMON'</span>) && args[<span class="code-number">0</span>] === <span class="code-string">'--daemon-worker'</span>) {
+    <span class="code-keyword">const</span> { runDaemonWorker } = <span class="code-keyword">await</span> import(<span class="code-string">'../daemon/workerRegistry.js'</span>);
+    <span class="code-keyword">await</span> runDaemonWorker(args[<span class="code-number">1</span>]);
+    <span class="code-keyword">return</span>;
+}</code></pre>
+
+                <div class="highlight-box">
+                    <strong>入口点职责：</strong>
+                    <ul>
+                        <li>解析 <code>--version</code>, <code>--dump-system-prompt</code>, <code>--daemon-worker</code> 等参数</li>
+                        <li>动态导入模块以优化快速路径（--version 等）</li>
+                        <li>处理特殊命令 (<code>daemon</code>, <code>remote-control</code>, <code>bg</code> 等)</li>
+                        <li>特性标志 (feature flag) 驱动的死代码消除</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>2. 主程序 (src/main.tsx)</h3>
+            <div class="card">
+                <p>4,683 行的 REPL 引导程序，负责初始化配置和认证、设置 GrowthBook 分析、加载 MCP 服务器、初始化插件和技能、启动交互式 REPL 或 headless 模式。</p>
+
+                <h4>关键初始化流程</h4>
+                <div class="arch-diagram">
+                    <div class="arch-flow">
+                        <div class="arch-node">profileCheckpoint()</div>
+                        <span class="arch-arrow">→</span>
+                        <div class="arch-node secondary">startMdmRawRead()</div>
+                        <span class="arch-arrow">→</span>
+                        <div class="arch-node accent">startKeychainPrefetch()</div>
+                    </div>
+                </div>
+                <div class="arch-diagram">
+                    <div class="arch-flow">
+                        <div class="arch-node">GrowthBook</div>
+                        <span class="arch-arrow">→</span>
+                        <div class="arch-node secondary">MCP Config</div>
+                        <span class="arch-arrow">→</span>
+                        <div class="arch-node accent">Plugins/Skills</div>
+                        <span class="arch-arrow">→</span>
+                        <div class="arch-node">REPL / Headless</div>
+                    </div>
+                </div>
+
+                <pre><code><span class="code-comment">// 性能分析入口点</span>
+profileCheckpoint(<span class="code-string">'main_tsx_entry'</span>)
+
+<span class="code-comment">// 并行读取 MDM 子进程</span>
+startMdmRawRead()
+
+<span class="code-comment">// 预取钥匙串认证</span>
+startKeychainPrefetch()</code></pre>
+            </div>
+
+            <h3>3. 查询引擎 (QueryEngine.ts)</h3>
+            <div class="card">
+                <p>负责查询生命周期和会话状态，是 SDK/无头模式的核心引擎。</p>
+
+                <h4>核心接口</h4>
+                <pre><code><span class="code-keyword">class</span> <span class="code-type">QueryEngine</span> {
+    <span class="code-comment">// 提交消息并返回 AsyncGenerator</span>
+    submitMessage(): <span class="code-type">AsyncGenerator</span>&lt;<span class="code-type">SDKMessage</span>&gt;
+
+    <span class="code-comment">// 管理消息历史</span>
+    messageHistory: <span class="code-type">Message</span>[]
+
+    <span class="code-comment">// 文件缓存</span>
+    fileCache: <span class="code-type">FileCache</span>
+
+    <span class="code-comment">// 使用量统计</span>
+    usageTracker: <span class="code-type">UsageStats</span>
+}</code></pre>
+            </div>
+
+            <h3>4. 主查询循环 (query.ts)</h3>
+            <div class="card">
+                <p>这是核心代理循环 (~785KB，最大的单文件)，实现完整的主 Agent 循环逻辑。</p>
+
+                <h4>循环结构</h4>
+                <pre><code><span class="code-keyword">export async function</span> <span class="code-function">*query</span>(params: <span class="code-type">QueryParams</span>): <span class="code-type">AsyncGenerator</span>&lt;...&gt; {
+    <span class="code-comment">// 主循环：直到 stop_reason != "tool_use"</span>
+    <span class="code-keyword">while</span> (<span class="code-keyword">true</span>) {
+        <span class="code-comment">// 1. 发送消息到 Claude API</span>
+        <span class="code-comment">// 2. 流式处理响应</span>
+        <span class="code-comment">// 3. 如果是 tool_use，执行工具</span>
+        <span class="code-comment">// 4. 追加 tool_result 到消息</span>
+        <span class="code-comment">// 5. 循环</span>
+    }
+}</code></pre>
+
+                <h4>关键机制</h4>
+                <div class="card-grid-3">
+                    <div class="card">
+                        <h4>🔄 自动压缩</h4>
+                        <p><code>autoCompact</code> - 当上下文窗口接近满时自动压缩</p>
+                    </div>
+                    <div class="card">
+                        <h4>⚡ 响应式压缩</h4>
+                        <p><code>REACTIVE_COMPACT</code> - 条件触发的上下文压缩</p>
+                    </div>
+                    <div class="card">
+                        <h4>💰 令牌预算</h4>
+                        <p><code>TOKEN_BUDGET</code> - 跟踪和管理令牌使用</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- 工具系统 -->
+        <section id="tools">
+            <h2><span class="icon">🛠️</span> 工具系统</h2>
+
+            <h3>工具接口 (Tool.ts)</h3>
+            <div class="card">
+                <p>工具是 Claude Code 的核心扩展机制，每个工具都有标准的接口定义。</p>
+
+                <pre><code><span class="code-keyword">export type</span> <span class="code-type">Tool</span>&lt;<span class="code-type">Input</span>, <span class="code-type">Output</span>, <span class="code-type">Progress</span>&gt; = {
+    name: <span class="code-type">string</span>
+    description: <span class="code-type">string</span>
+    inputSchema: <span class="code-type">z.ZodType</span>&lt;<span class="code-type">Input</span>&gt;
+    outputSchema?: <span class="code-type">z.ZodType</span>&lt;<span class="code-type">Output</span>&gt;
+
+    isEnabled: () =&gt; <span class="code-type">boolean</span>
+    isConcurrencySafe?: (input: <span class="code-type">Input</span>) =&gt; <span class="code-type">boolean</span>
+
+    call: (input: <span class="code-type">Input</span>, context: <span class="code-type">ToolUseContext</span>) =&gt; <span class="code-type">Promise</span>&lt;<span class="code-type">Output</span>&gt;
+
+    validate?: (input: <span class="code-type">unknown</span>) =&gt; <span class="code-type">ValidationResult</span>
+    checkPermissions?: (input: <span class="code-type">Input</span>, context: <span class="code-type">ToolPermissionContext</span>) =&gt; <span class="code-type">PermissionResult</span>
+    render?: (input: <span class="code-type">Input</span>, result: <span class="code-type">Output</span>) =&gt; <span class="code-type">React.ReactNode</span>
+    prompt?: (input: <span class="code-type">Input</span>) =&gt; <span class="code-type">string</span> | <span class="code-keyword">null</span>
+}</code></pre>
+            </div>
+
+            <h3>内置工具列表</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <h4>📦 AgentTool</h4>
+                    <p>子 Agent 生成 - 可以创建和管理子任务代理</p>
+                </div>
+                <div class="card">
+                    <h4>💻 BashTool</h4>
+                    <p>Shell 命令执行 - 操作系统命令</p>
+                </div>
+                <div class="card">
+                    <h4>📖 FileReadTool</h4>
+                    <p>文件读取 - 支持 PDF、图片等格式</p>
+                </div>
+                <div class="card">
+                    <h4>✏️ FileEditTool</h4>
+                    <p>字符串替换编辑 - 精确的文本替换</p>
+                </div>
+                <div class="card">
+                    <h4>📝 FileWriteTool</h4>
+                    <p>完整文件创建 - 新建或覆盖文件</p>
+                </div>
+                <div class="card">
+                    <h4>🔍 GlobTool</h4>
+                    <p>文件模式搜索 - glob 通配符支持</p>
+                </div>
+                <div class="card">
+                    <h4>🔎 GrepTool</h4>
+                    <p>内容搜索 - 正则表达式搜索</p>
+                </div>
+                <div class="card">
+                    <h4>🌐 WebFetchTool</h4>
+                    <p>HTTP 获取 - 网页内容抓取</p>
+                </div>
+                <div class="card">
+                    <h4>🔍 WebSearchTool</h4>
+                    <p>网络搜索 - 搜索引擎集成</p>
+                </div>
+                <div class="card">
+                    <h4>🔌 MCPTool</h4>
+                    <p>MCP 协议工具包装 - 扩展协议支持</p>
+                </div>
+                <div class="card">
+                    <h4>⚡ SkillTool</h4>
+                    <p>技能调用 - 调用内置技能</p>
+                </div>
+            </div>
+
+            <h3>并发控制 (StreamingToolExecutor)</h3>
+            <div class="card">
+                <p>工具执行器实现了智能的并发控制机制：</p>
+                <ul>
+                    <li><strong>并发安全工具</strong>: 可并行执行，提高效率</li>
+                    <li><strong>非并发工具</strong>: 必须单独执行，确保独占访问</li>
+                    <li><strong>结果缓冲</strong>: 按接收顺序缓冲和发送</li>
+                </ul>
+
+                <pre><code><span class="code-comment">// 并发安全工具可并行执行</span>
+<span class="code-comment">// 非并发工具必须单独执行 (独占访问)</span>
+<span class="code-comment">// 结果按接收顺序缓冲和发送</span></code></pre>
+            </div>
+
+            <h3>权限系统</h3>
+            <div class="card">
+                <p>Claude Code 实现了细粒度的权限管理机制。</p>
+
+                <h4>权限检查流程</h4>
+                <div class="arch-diagram">
+                    <div class="arch-flow">
+                        <div class="arch-node">canUseTool()</div>
+                        <span class="arch-arrow">→</span>
+                        <div class="arch-node secondary">规则匹配</div>
+                        <span class="arch-arrow">→</span>
+                        <div class="arch-node accent">UI 提示</div>
+                    </div>
+                </div>
+
+                <h4>权限上下文</h4>
+                <pre><code>ToolPermissionContext {
+    mode: 'default' | 'ask' | 'bypass'
+    alwaysAllowRules: Rule[]
+    alwaysDenyRules: Rule[]
+    alwaysAskRules: Rule[]
+    additionalWorkingDirectories: WorkingDirMapping[]
+}</code></pre>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- 依赖分析 -->
+        <section id="deps">
+            <h2><span class="icon">📦</span> 依赖分析</h2>
+
+            <h3>核心依赖</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>包名</th>
+                            <th>版本</th>
+                            <th>用途</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>@anthropic-ai/sdk</code></td>
+                            <td>^1.0.0</td>
+                            <td>Anthropic 官方 SDK</td>
+                        </tr>
+                        <tr>
+                            <td><code>@modelcontextprotocol/sdk</code></td>
+                            <td>^1.0.0</td>
+                            <td>MCP 协议实现</td>
+                        </tr>
+                        <tr>
+                            <td><code>react</code>, <code>react-dom</code></td>
+                            <td>^19.0.0</td>
+                            <td>UI 组件</td>
+                        </tr>
+                        <tr>
+                            <td><code>ink</code></td>
+                            <td>^6.0.0</td>
+                            <td>React for CLI 终端 UI</td>
+                        </tr>
+                        <tr>
+                            <td><code>@commander-js/extra-typings</code></td>
+                            <td>^14.0.0</td>
+                            <td>命令行参数解析</td>
+                        </tr>
+                        <tr>
+                            <td><code>chalk</code></td>
+                            <td>^5.0.0</td>
+                            <td>终端着色</td>
+                        </tr>
+                        <tr>
+                            <td><code>lodash-es</code></td>
+                            <td>^4.17.0</td>
+                            <td>工具函数库</td>
+                        </tr>
+                        <tr>
+                            <td><code>zod</code></td>
+                            <td>^3.0.0</td>
+                            <td>Schema 验证</td>
+                        </tr>
+                        <tr>
+                            <td><code>ws</code></td>
+                            <td>^8.0.0</td>
+                            <td>WebSocket 传输</td>
+                        </tr>
+                        <tr>
+                            <td><code>axios</code></td>
+                            <td>^1.0.0</td>
+                            <td>HTTP 客户端</td>
+                        </tr>
+                        <tr>
+                            <td><code>zx</code></td>
+                            <td>^8.0.0</td>
+                            <td>Shell 脚本辅助</td>
+                        </tr>
+                        <tr>
+                            <td><code>yaml</code></td>
+                            <td>^2.0.0</td>
+                            <td>YAML 解析</td>
+                        </tr>
+                        <tr>
+                            <td><code>dotenv</code></td>
+                            <td>^16.0.0</td>
+                            <td>环境变量</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>开发依赖</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <h4>🔧 esbuild</h4>
+                    <p>代码打包 - 极速打包工具</p>
+                </div>
+                <div class="card">
+                    <h4>📘 TypeScript</h4>
+                    <p>类型检查和编译</p>
+                </div>
+            </div>
+
+            <h3>特性标志 (Feature Flags)</h3>
+            <div class="card">
+                <p>项目使用 Bun 的 <code>feature()</code> 编译时函数实现死代码消除。在 Bun 编译时，<code>feature('X')</code> 返回 true 或 false，对应的代码块被 esbuild 消除。</p>
+
+                <div class="highlight-box warning">
+                    <strong>重要：</strong>在发布的 npm 包中，所有 <code>feature()</code> 调用都被替换为 <code>false</code>，对应的代码块被完全消除。
+                </div>
+            </div>
+
+            <h4>已知特性标志</h4>
+            <div class="flag-grid">
+                <div class="flag-item">DAEMON</div>
+                <div class="flag-item">KAIROS</div>
+                <div class="flag-item">COORDINATOR_MODE</div>
+                <div class="flag-item">BRIDGE_MODE</div>
+                <div class="flag-item">HISTORY_SNIP</div>
+                <div class="flag-item">CONTEXT_COLLAPSE</div>
+                <div class="flag-item">TRANSCRIPT_CLASSIFIER</div>
+                <div class="flag-item">AGENTIC_AUTH</div>
+                <div class="flag-item">RECORDER_MODE</div>
+                <div class="flag-item">GROWTHBOOK</div>
+            </div>
+
+            <pre><code><span class="code-comment">// 在 Bun 编译时，feature('DAEMON') 返回 true 或 false</span>
+<span class="code-comment">// 发布的 npm 包中所有 feature() 调用都被替换为 false</span>
+<span class="code-keyword">if</span> (feature(<span class="code-string">'DAEMON'</span>) && args[<span class="code-number">0</span>] === <span class="code-string">'--daemon-worker'</span>) {
+    <span class="code-comment">// 这个分支在发布版本中永远不执行</span>
+}</code></pre>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- 设计模式 -->
+        <section id="patterns">
+            <h2><span class="icon">🎨</span> 关键设计模式</h2>
+
+            <h3>1. 异步生成器流</h3>
+            <div class="card">
+                <p>Claude Code 大量使用 AsyncGenerator 进行流式处理，这是实现高效响应的关键。</p>
+
+                <pre><code><span class="code-comment">// API 流式响应处理</span>
+<span class="code-keyword">async function</span> *<span class="code-function">query</span>(params): <span class="code-type">AsyncGenerator</span>&lt;<span class="code-type">SDKMessage</span>&gt; {
+    <span class="code-keyword">const</span> stream = <span class="code-keyword">await</span> client.messages.create({...})
+
+    <span class="code-keyword">for await</span> (<span class="code-keyword">const</span> event <span class="code-keyword">of</span> stream) {
+        <span class="code-keyword">if</span> (event.type === <span class="code-string">'content_block_delta'</span>) {
+            <span class="code-keyword">yield</span> { type: <span class="code-string">'progress'</span>, delta: event.delta }
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h3>2. 工厂模式 - buildTool()</h3>
+            <div class="card">
+                <p>统一的工具构建工厂，简化工具创建过程。</p>
+
+                <pre><code><span class="code-keyword">export function</span> <span class="code-function">buildTool</span>&lt;<span class="code-type">Input</span>, <span class="code-type">Output</span>, <span class="code-type">Progress</span>&gt;(
+    definition: <span class="code-type">ToolDefinition</span>
+): <span class="code-type">Tool</span>&lt;<span class="code-type">Input</span>, <span class="code-type">Output</span>, <span class="code-type">Progress</span>&gt; {
+    <span class="code-keyword">return</span> {
+        ...definition,
+        isEnabled: () =&gt; <span class="code-keyword">true</span>,
+        isConcurrencySafe: () =&gt; <span class="code-keyword">false</span>,
+    }
+}</code></pre>
+            </div>
+
+            <h3>3. 快照状态 - FileHistoryState</h3>
+            <div class="card">
+                <p>用于文件编辑的撤销/重做功能。</p>
+
+                <pre><code><span class="code-keyword">interface</span> <span class="code-type">FileHistoryState</span> {
+    snapshots: <span class="code-type">Map</span>&lt;<span class="code-type">string</span>, <span class="code-type">Snapshot</span>&gt;
+    undo(path: <span class="code-type">string</span>): <span class="code-type">boolean</span>
+    redo(path: <span class="code-type">string</span>): <span class="code-type">boolean</span>
+}</code></pre>
+            </div>
+
+            <h3>4. Fire-and-forget 模式</h3>
+            <div class="card">
+                <p>非阻塞写入，提高性能。</p>
+
+                <pre><code><span class="code-comment">// Fire-and-forget 写入会话历史</span>
+<span class="code-keyword">void</span> recordTranscript(message).catch(err =&gt; logError(err))</code></pre>
+            </div>
+
+            <h3>5. 延迟 Schema - lazySchema()</h3>
+            <div class="card">
+                <p>延迟 Zod 验证直到实际使用，优化启动性能。</p>
+
+                <pre><code><span class="code-keyword">export function</span> <span class="code-function">lazySchema</span>&lt;<span class="code-type">T</span>&gt;(fn: () =&gt; <span class="code-type">z.ZodType</span>&lt;<span class="code-type">T</span>&gt;): <span class="code-type">z.ZodType</span>&lt;<span class="code-type">T</span>&gt;</code></pre>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- CLI 命令结构 -->
+        <section id="commands">
+            <h2><span class="icon">⌨️</span> CLI 命令结构</h2>
+
+            <h3>主要命令分类</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <h4>🔐 认证相关</h4>
+                    <ul>
+                        <li><code>/login</code> - 登录</li>
+                        <li><code>/logout</code> - 登出</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>💬 会话管理</h4>
+                    <ul>
+                        <li><code>/resume</code> - 恢复会话</li>
+                        <li><code>/session</code> - 会话管理</li>
+                        <li><code>/compact</code> - 上下文压缩</li>
+                        <li><code>/clear</code> - 清除历史</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>🤖 Agent 相关</h4>
+                    <ul>
+                        <li><code>/agents</code> - Agent 管理</li>
+                        <li><code>/tasks</code> - 任务管理</li>
+                        <li><code>/plan</code> - 计划模式</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>🔧 开发辅助</h4>
+                    <ul>
+                        <li><code>/commit</code> - 提交更改</li>
+                        <li><code>/review</code> - 代码审查</li>
+                        <li><code>/mcp</code> - MCP 服务器管理</li>
+                        <li><code>/diff</code> - 差异查看</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>⚙️ 配置</h4>
+                    <ul>
+                        <li><code>/config</code> - 配置管理</li>
+                        <li><code>/model</code> - 模型选择</li>
+                        <li><code>/theme</code> - 主题设置</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>全局选项</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>选项</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>--version</code>, <code>-v</code></td>
+                            <td>显示版本</td>
+                        </tr>
+                        <tr>
+                            <td><code>--help</code></td>
+                            <td>显示帮助</td>
+                        </tr>
+                        <tr>
+                            <td><code>-p</code>, <code>--print</code></td>
+                            <td>非交互模式</td>
+                        </tr>
+                        <tr>
+                            <td><code>--model</code></td>
+                            <td>指定模型</td>
+                        </tr>
+                        <tr>
+                            <td><code>--no-config</code></td>
+                            <td>跳过配置加载</td>
+                        </tr>
+                        <tr>
+                            <td><code>--spare</code></td>
+                            <td>最小化输出</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- 关键文件 -->
+        <section id="keyfiles">
+            <h2><span class="icon">📄</span> 关键文件参考</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>文件路径</th>
+                            <th>行数/大小</th>
+                            <th>用途</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>src/query.ts</code></td>
+                            <td>~785KB</td>
+                            <td>主 Agent 循环 (最大文件)</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/main.tsx</code></td>
+                            <td>4,683 行</td>
+                            <td>REPL 引导程序</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/Tool.ts</code></td>
+                            <td>29,516 行</td>
+                            <td>工具接口和 buildTool 工厂</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/QueryEngine.ts</code></td>
+                            <td>46,630 行</td>
+                            <td>SDK/无头查询引擎</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/commands.ts</code></td>
+                            <td>25,185 行</td>
+                            <td>斜杠命令定义</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/tools.ts</code></td>
+                            <td>17,294 行</td>
+                            <td>工具注册表</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/services/api/claude.ts</code></td>
+                            <td>~20,000 行</td>
+                            <td>Claude API 客户端</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/utils/sessionStorage.ts</code></td>
+                            <td>180,620 行</td>
+                            <td>会话持久化</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/utils/messages.ts</code></td>
+                            <td>193,203 行</td>
+                            <td>消息处理</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/state/AppStateStore.ts</code></td>
+                            <td>21,847 行</td>
+                            <td>状态存储</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/bridge/bridgeMain.ts</code></td>
+                            <td>~15,000 行</td>
+                            <td>远程桥接</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- 构建系统 -->
+        <section id="build">
+            <h2><span class="icon">🔨</span> 构建与测试基础设施</h2>
+
+            <h3>构建脚本</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>脚本</th>
+                            <th>用途</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>npm run prepare-src</code></td>
+                            <td>源码预处理 (替换 feature/MACRO)</td>
+                        </tr>
+                        <tr>
+                            <td><code>npm run build</code></td>
+                            <td>完整构建 (prepare-src + esbuild)</td>
+                        </tr>
+                        <tr>
+                            <td><code>npm run check</code></td>
+                            <td>TypeScript 类型检查</td>
+                        </tr>
+                        <tr>
+                            <td><code>npm start</code></td>
+                            <td>运行构建的 CLI</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>构建流程</h3>
+            <div class="arch-diagram">
+                <div class="arch-flow">
+                    <div class="arch-node">1. 复制<br><small>src/ → build-src/</small></div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-node secondary">2. 转换<br><small>feature → false<br>MACRO → 值</small></div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-node accent">3. 入口<br><small>包装器</small></div>
+                    <span class="arch-arrow">→</span>
+                    <div class="arch-node">4. 打包<br><small>esbuild</small></div>
+                </div>
+            </div>
+
+            <h3>转换规则</h3>
+            <div class="card">
+                <pre><code><span class="code-comment">// 1. feature('X') → false</span>
+feature(<span class="code-string">'DAEMON'</span>)  →  <span class="code-keyword">false</span>
+
+<span class="code-comment">// 2. MACRO.VERSION → '2.1.88'</span>
+<span class="code-variable">${MACRO.VERSION}</span>  →  <span class="code-string">'2.1.88'</span>
+
+<span class="code-comment">// 3. import from 'bun:bundle' → 存根</span>
+<span class="code-keyword">import</span> ... <span class="code-keyword">from</span> <span class="code-string">'bun:bundle'</span>  →  存根模块</code></pre>
+            </div>
+
+            <h3>已知构建限制</h3>
+            <div class="highlight-box warning">
+                <ul>
+                    <li><strong>Bun 编译时固有</strong>: <code>feature()</code>, <code>MACRO</code>, <code>bun:bundle</code> 无法完全用 esbuild 复制</li>
+                    <li><strong>108 个缺失模块</strong>: 特性标志启用的内部模块被死代码消除，不存在于发布版本</li>
+                    <li><strong>bun:ffi</strong>: 用于原生代理支持，已被存根化</li>
+                </ul>
+            </div>
+
+            <h3>TypeScript 配置</h3>
+            <div class="card">
+                <pre><code>{
+    <span class="code-string">"compilerOptions"</span>: {
+        <span class="code-string">"target"</span>: <span class="code-string">"ES2022"</span>,
+        <span class="code-string">"module"</span>: <span class="code-string">"ESNext"</span>,
+        <span class="code-string">"moduleResolution"</span>: <span class="code-string">"bundler"</span>,
+        <span class="code-string">"strict"</span>: <span class="code-keyword">false</span>,
+        <span class="code-string">"jsx"</span>: <span class="code-string">"react-jsx"</span>,
+        <span class="code-string">"outDir"</span>: <span class="code-string">"dist"</span>,
+        <span class="code-string">"paths"</span>: {
+            <span class="code-string">"bun:bundle"</span>: [<span class="code-string">"stubs/bun-bundle.ts"</span>],
+            <span class="code-string">"src/*"</span>: [<span class="code-string">"src/*"</span>]
+        }
+    }
+}</code></pre>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- 特殊功能 -->
+        <section id="special">
+            <h2><span class="icon">🔮</span> 特殊功能分析</h2>
+
+            <h3>1. 卧底模式 (Undercover Mode)</h3>
+            <div class="card">
+                <p>Anthropic 员工在公开仓库贡献时的安全系统。</p>
+
+                <div class="highlight-box warning">
+                    <strong>激活条件</strong>: <code>USER_TYPE === 'ant'</code> 且非内部白名单仓库<br>
+                    <strong>无法强制关闭</strong>: "There is NO force-OFF"<br>
+                    <strong>效果</strong>: 剥离所有 AI 归属，commit 看起来像人类编写
+                </div>
+            </div>
+
+            <h3>2. 远程控制 (Remote Control / Bridge)</h3>
+            <div class="card">
+                <p>通过 <code>bridgeMain.ts</code> 实现安全的远程连接。</p>
+
+                <ul>
+                    <li>心跳保持连接</li>
+                    <li>JWT 刷新机制</li>
+                    <li>工作秘密 (Work Secret) 认证</li>
+                    <li>多会话管理 (最多 32 个并发会话)</li>
+                </ul>
+            </div>
+
+            <h3>3. 上下文压缩</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <h4>🔄 自动压缩 (autoCompact)</h4>
+                    <ul>
+                        <li>令牌数达到阈值时自动触发</li>
+                        <li>使用摘要替换历史消息</li>
+                        <li>最大输出令牌保留 (20,000)</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>✂️ Snip 压缩 (HISTORY_SNIP)</h4>
+                    <ul>
+                        <li>基于 snip 的压缩</li>
+                        <li>snip 边界处理器</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>4. 分析与遥测</h3>
+            <div class="card">
+                <h4>双管道架构</h4>
+                <div class="card-grid">
+                    <div class="card">
+                        <h4>📊 第一方 (Anthropic)</h4>
+                        <p>OpenTelemetry + Protocol Buffers</p>
+                    </div>
+                    <div class="card">
+                        <h4>📈 第三方 (Datadog)</h4>
+                        <p>仅 64 种预批准事件</p>
+                    </div>
+                </div>
+
+                <h4>收集内容</h4>
+                <ul>
+                    <li><strong>环境指纹</strong>: 平台、终端、CI/CD 等</li>
+                    <li><strong>进程指标</strong>: 内存、CPU</li>
+                    <li><strong>用户追踪</strong>: 会话 ID、仓库哈希</li>
+                    <li><strong>工具输入详情</strong>: 可通过 <code>OTEL_LOG_TOOL_DETAILS=1</code> 启用完整日志</li>
+                </ul>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- 总结 -->
+        <section id="summary">
+            <h2><span class="icon">📊</span> 总结</h2>
+
+            <h3>架构亮点</h3>
+            <div class="card-grid">
+                <div class="card">
+                    <h4>✅ 模块化设计</h4>
+                    <p>清晰的分层 (CLI → QueryEngine → Tools → Services)</p>
+                </div>
+                <div class="card">
+                    <h4>✅ 异步流处理</h4>
+                    <p>完整的 AsyncGenerator 流式处理管道</p>
+                </div>
+                <div class="card">
+                    <h4>✅ 权限分层</h4>
+                    <p>细粒度的权限规则和钩子系统</p>
+                </div>
+                <div class="card">
+                    <h4>✅ 插件架构</h4>
+                    <p>支持插件扩展和动态加载</p>
+                </div>
+                <div class="card">
+                    <h4>✅ 状态管理</h4>
+                    <p>React Context + 外部存储的混合模式</p>
+                </div>
+                <div class="card">
+                    <h4>✅ 压缩策略</h4>
+                    <p>自动+手动的多级上下文压缩</p>
+                </div>
+            </div>
+
+            <h3>技术债务</h3>
+            <div class="card">
+                <ul>
+                    <li><strong>巨大的单文件</strong>: <code>query.ts</code> 785KB 难以维护</li>
+                    <li><strong>复杂的特性标志</strong>: 108 个缺失模块导致构建不完整</li>
+                    <li><strong>硬编码值</strong>: 多个魔法数字和字符串</li>
+                    <li><strong>循环依赖</strong>: 需要大量的 <code>require()</code> 动态导入绕过</li>
+                </ul>
+            </div>
+
+            <div class="highlight-box success">
+                <h4>最终评价</h4>
+                <p>Claude Code 是一个复杂的、生产级的 CLI 应用，其架构体现了 Anthropic 在 Claude Code 中实现的大量高级功能和复杂工程实践。该源码揭示了完整的权限管理、远程控制、分析遥测等企业级功能，同时也展示了其对安全性、隐私和用户体验的深度考量。</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Claude Code v2.1.88 源代码分析报告 | 基于 <code>@anthropic-ai/claude-code</code> npm 包</p>
+        <p style="margin-top: 10px; font-size: 12px;">
+            分析时间: 2026-04-01 | 源文件数: 1,884 | 代码行数: 512,664+
+        </p>
+    </footer>
+
+    <script>
+        // Smooth scroll and active nav highlighting
+        document.querySelectorAll('.nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href').substring(1);
+                const target = document.getElementById(targetId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+
+                // Update active state
+                document.querySelectorAll('.nav a').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Intersection Observer for active nav highlighting
+        const sections = document.querySelectorAll('section[id]');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.getAttribute('id');
+                    document.querySelectorAll('.nav a').forEach(l => {
+                        l.classList.toggle('active', l.getAttribute('href') === '#' + id);
+                    });
+                }
+            });
+        }, { threshold: 0.3 });
+
+        sections.forEach(section => observer.observe(section));
+
+        // Animate stats on scroll
+        const stats = document.querySelectorAll('.stat-value');
+        const animateStats = () => {
+            stats.forEach(stat => {
+                const rect = stat.getBoundingClientRect();
+                if (rect.top < window.innerHeight && rect.bottom > 0) {
+                    stat.style.animation = 'countUp 1s ease-out forwards';
+                }
+            });
+        };
+
+        // Add countUp animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes countUp {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .stat-value { opacity: 0; }
+        `;
+        document.head.appendChild(style);
+
+        window.addEventListener('scroll', animateStats);
+        window.addEventListener('load', animateStats);
+    </script>
+</body>
+</html>
